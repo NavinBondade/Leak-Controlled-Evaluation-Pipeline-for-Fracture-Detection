@@ -14,3 +14,4 @@ docs/paper/*.bbl
 docs/paper/*.blg
 docs/paper/*.log
 docs/paper/*.out
+!fig/*.gif
