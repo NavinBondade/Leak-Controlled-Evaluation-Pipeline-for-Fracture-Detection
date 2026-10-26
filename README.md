@@ -313,4 +313,4 @@ Run every script from the `FractureDetection` folder with `PYTHONPATH=.` in this
 ## Author
 
 Navin Bondade
-MSc Health Data Science, University College London
+Researcher, University College London
