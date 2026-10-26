@@ -13,8 +13,10 @@ from matplotlib.patches import Rectangle
 from fracai.data import load_boxes
 from fracai.gradcam import gradcam
 from fracai.metrics import thr_at_spec
+from fracai.plotstyle import use
 from fracai.train import build_model, dev, load_cache, to_batch
 
+use()
 OUT = Path("results/figures/slides")
 OUT.mkdir(parents=True, exist_ok=True)
 N = 6
@@ -63,30 +65,21 @@ for k, grp in need.groupby("fold"):
     torch.cuda.empty_cache()
 
 for key, (title, g) in groups.items():
-    fig, axes = plt.subplots(2, N, figsize=(16, 6.4))
+    fig, axes = plt.subplots(2, N, figsize=(10, 3.9), gridspec_kw={"wspace": 0.04, "hspace": 0.06})
     for j, (_, r) in enumerate(g.iterrows()):
         top, bottom = axes[0, j], axes[1, j]
         for ax in (top, bottom):
             ax.imshow(arr[row_of[r.case_id]], cmap="gray", vmin=0, vmax=255)
-            ax.axis("off")
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_visible(False)
         bottom.imshow(cams[r.case_id], cmap="jet", alpha=0.4, vmin=0, vmax=1)
         for bx, by, bw, bh in boxes.get(r.case_id, []):
-            top.add_patch(Rectangle((bx, by), bw, bh, fill=False, ec="lime", lw=2))
-        top.set_title(f"{r.bodypart}, score {r.score:+.1f}", fontsize=11)
-    axes[0, 0].text(
-        -0.04, 0.5, "image", transform=axes[0, 0].transAxes, rotation=90, ha="right", va="center", fontsize=12
-    )
-    axes[1, 0].text(
-        -0.04, 0.5, "Grad-CAM", transform=axes[1, 0].transAxes, rotation=90, ha="right", va="center", fontsize=12
-    )
-    fig.suptitle(title, x=0.01, ha="left", fontsize=15, weight="bold")
-    fig.text(
-        0.01,
-        0.01,
-        "Green box = annotated fracture. Score 0 is the fixed 90%-specificity threshold. For internal review only.",
-        fontsize=9,
-    )
-    fig.tight_layout(rect=(0, 0.03, 1, 0.95))
-    fig.savefig(OUT / f"grid_{key}.png", dpi=150)
+            top.add_patch(Rectangle((bx, by), bw, bh, fill=False, ec="lime", lw=1.5))
+        top.set_title(f"{r.bodypart}, {r.score:+.1f}", fontsize=9, fontweight="normal", loc="center")
+    axes[0, 0].set_ylabel("Image", fontsize=10)
+    axes[1, 0].set_ylabel("Grad-CAM", fontsize=10)
+    fig.savefig(OUT / f"grid_{key}.png", bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
     print("saved", OUT / f"grid_{key}.png")

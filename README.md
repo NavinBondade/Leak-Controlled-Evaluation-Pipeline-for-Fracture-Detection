@@ -1,3 +1,9 @@
+<div align="center">
+
+![Leak-Controlled Evaluation Pipeline for Fracture Detection](FractureDetection/fig/banner.png)
+
+</div>
+
 # Leak-Controlled Evaluation Pipeline for Fracture Detection
 
 An open evaluation pipeline for fracture detection on public radiographs. A ConvNeXt-Tiny classifier is trained on FracAtlas with a leak-controlled five-fold split, scored out of fold at an operating point fixed beforehand at 90% specificity, and then tested without any adjustment on GRAZPEDWRI-DX, a paediatric wrist dataset from a different institution. The model reaches an AUC of 0.92 internally and 0.83 externally, and the external result falls to 0.74 once casted images are removed, because the model learned to treat a cast as a sign of fracture. A set of experiments aimed at small fractures was inconclusive. The code, the audits and the ED simulation are provided so that the same questions can be asked of any other fracture model. This is a research evaluation on public data and not a clinical device.
@@ -90,7 +96,7 @@ Moving from all images to initial exams, which is the situation in which a clini
 
 <div align="center">
 
-![ROC](FractureDetection/fig/roc_internal_vs_external.png)
+<img src="FractureDetection/fig/roc_internal_vs_external.png" width="62%" alt="ROC curves">
 
 *Figure 3: ROC curves for FracAtlas (internal), GRAZ (external) and GRAZ without cast or metal. Dots mark the fixed operating point*
 

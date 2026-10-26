@@ -17,8 +17,10 @@ from matplotlib.patches import FancyArrowPatch, Rectangle
 from fracai.data import load_boxes
 from fracai.gradcam import gradcam
 from fracai.metrics import thr_at_spec
+from fracai.plotstyle import use
 from fracai.train import build_model, dev, load_cache, to_batch
 
+use()
 matplotlib.rcParams["animation.ffmpeg_path"] = shutil.which("ffmpeg")
 OUT = Path("results/figures/slides")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -51,7 +53,7 @@ def save(fig, update, frames, name):
     anim = animation.FuncAnimation(fig, update, frames=frames, interval=1000 / FPS)
     writer = animation.FFMpegWriter(fps=FPS, bitrate=4000, extra_args=["-pix_fmt", "yuv420p"])
     anim.save(OUT / name, writer=writer, dpi=100)
-    anim.save(OUT / name.replace(".mp4", ".gif"), writer=animation.PillowWriter(fps=FPS), dpi=70)
+    anim.save(OUT / name.replace(".mp4", ".gif"), writer=animation.PillowWriter(fps=FPS), dpi=90)
     update(frames - 1)
     fig.savefig(OUT / name.replace("anim_", "final_").replace(".mp4", ".png"), dpi=150)
     plt.close(fig)
@@ -75,13 +77,12 @@ shapes = {name: tuple(a.shape[1:]) for name, a in acts.items()}
 steps = [*maps, "Grad-CAM"]
 notes = ["fine detail", "edges", "textures", "parts of bones", "whole-image context", "what raised the score"]
 
-fig = plt.figure(figsize=(12.8, 7.2))
-fig.suptitle("One X-ray through the network", x=0.02, ha="left", fontsize=20, weight="bold")
-ax_in = fig.add_axes([0.02, 0.06, 0.36, 0.80])
+fig = plt.figure(figsize=(10, 5.6))
+ax_in = fig.add_axes([0.02, 0.08, 0.36, 0.80])
 ax_in.imshow(arr[row_of[detected.case_id]], cmap="gray", vmin=0, vmax=255)
 for bx, by, bw, bh in boxes[detected.case_id]:
     ax_in.add_patch(Rectangle((bx, by), bw, bh, fill=False, ec="lime", lw=2))
-ax_in.set_title("Input 512 x 512 (green = annotated fracture)", loc="left", fontsize=12)
+ax_in.set_title("Input, 512 x 512 (green: annotated fracture)", fontsize=10)
 ax_in.axis("off")
 panels = []
 for j, name in enumerate(steps):
@@ -96,17 +97,11 @@ for j, name in enumerate(steps):
         im = ax.imshow(m / m.max(), cmap="viridis")
         c, h, w = shapes[name]
         title = f"{name}: {h}x{w}, {c} ch"
-    ax.set_title(f"{title}\n{notes[j]}", fontsize=10, loc="left")
+    ax.set_title(f"{title}\n{notes[j]}", fontsize=9, fontweight="normal")
     im.set_alpha(0.0)
     panels.append(im)
 result = fig.text(
-    0.42, 0.075, f"Score {detected.score:+.1f}  ->  above 0, flagged as a fracture", fontsize=16, weight="bold", alpha=0
-)
-fig.text(
-    0.02,
-    0.01,
-    "Mean absolute activation across channels. Labels are informal. Fold model, 90%-specificity threshold = 0.",
-    fontsize=9,
+    0.42, 0.06, f"Score {detected.score:+.1f}: above 0, flagged as a fracture", fontsize=11, weight="bold", alpha=0
 )
 LEAD, EACH, TAIL = 10, 12, 35
 
@@ -129,8 +124,7 @@ for r, _ in cases:
     model = load_fold_model(r.fold)
     cams.append(gradcam(model, to_batch(arr, [row_of[r.case_id]], False, 512))[0])
     del model
-fig, axes = plt.subplots(1, 2, figsize=(12.8, 7.2))
-fig.suptitle("Where the model looks", x=0.02, ha="left", fontsize=20, weight="bold")
+fig, axes = plt.subplots(1, 2, figsize=(10, 5.2))
 overlays, rects, labels = [], [], []
 for ax, (r, title), cm in zip(axes, cases, cams):
     ax.imshow(arr[row_of[r.case_id]], cmap="gray", vmin=0, vmax=255)
@@ -141,7 +135,7 @@ for ax, (r, title), cm in zip(axes, cases, cams):
         ax.add_patch(rect)
         group.append(rect)
     rects.append(group)
-    ax.set_title(title, loc="left", fontsize=16, color=BLUE if r.score >= 0 else "#c0392b")
+    ax.set_title(title, fontsize=12, color=BLUE if r.score >= 0 else "#c0392b")
     labels.append(
         ax.text(
             0.02,
@@ -149,14 +143,13 @@ for ax, (r, title), cm in zip(axes, cases, cams):
             f"score {r.score:+.1f}",
             transform=ax.transAxes,
             color="white",
-            fontsize=18,
+            fontsize=13,
             weight="bold",
             alpha=0,
         )
     )
     ax.axis("off")
-fig.text(0.02, 0.01, "Green = annotated fracture. Heatmap = Grad-CAM. Saliency is not proof of mechanism.", fontsize=10)
-fig.tight_layout(rect=(0, 0.03, 1, 0.94))
+fig.tight_layout()
 
 
 def update2(f):
