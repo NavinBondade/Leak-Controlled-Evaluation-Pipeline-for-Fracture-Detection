@@ -74,8 +74,6 @@ Every interval is a 95% percentile bootstrap with 1,000 draws that resamples who
 
 </div>
 
-Figure 1 places every audit after the threshold is fixed. No reported number comes from a model or threshold that had seen the scored images. Figure 2 shows what the network computes on a single image.
-
 <div align="center">
 
 <p align="center">
