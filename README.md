@@ -32,7 +32,7 @@ The development and audit set is FracAtlas, which contains 4,083 radiographs of 
 | Grouping | perceptual-hash near-duplicates and multi-scan runs | patient |
 | Role | five-fold training and audits | one-shot external test |
 
-<sub><b>Table 1.</b> The two datasets</sub>
+<b>Table 1.</b> The two datasets
 
 </div>
 
@@ -49,7 +49,7 @@ The pipeline runs from raw images to an external verdict in the order shown belo
 <p align="center">
 <img src="FractureDetection/fig/pipeline.png" alt="Pipeline">
 <br>
-<sub><b>Figure 1.</b> The evaluation pipeline, from hashing and splitting to the external test, the audits and the illustrative simulation</sub>
+<b>Figure 1.</b> The evaluation pipeline, from hashing and splitting to the external test, the audits and the illustrative simulation
 </p>
 <br>
 
@@ -64,7 +64,7 @@ The pipeline also contains Grad-CAM (Selvaraju et al., 2019) and occlusion audit
 <p align="center">
 <img src="FractureDetection/fig/layers_final.png" alt="Layers">
 <br>
-<sub><b>Figure 2.</b> One detected fracture through the stem and the four stages of the network, ending on the Grad-CAM overlay. Stage labels are informal and the maps show mean absolute activation</sub>
+<b>Figure 2.</b> One detected fracture through the stem and the four stages of the network, ending on the Grad-CAM overlay. Stage labels are informal and the maps show mean absolute activation
 </p>
 <br>
 
@@ -94,7 +94,7 @@ On GRAZPEDWRI-DX the same model, with the same threshold rule and no refitting, 
 | GRAZ, initial exams only | 0.697 (0.687 to 0.707) | 0.540 | 0.790 |
 | GRAZ, cast present (96% fractured) | 0.560 | 0.995 | 0.017 |
 
-<sub><b>Table 2.</b> Internal and external performance at the pre-fixed operating point</sub>
+<b>Table 2.</b> Internal and external performance at the pre-fixed operating point
 
 </div>
 
@@ -105,7 +105,7 @@ Moving from all images to initial exams, which is the situation in which a clini
 <p align="center">
 <img src="FractureDetection/fig/roc_internal_vs_external.png" alt="ROC curves" width="46%">
 <br>
-<sub><b>Figure 3.</b> ROC curves for FracAtlas (internal), GRAZ (external) and GRAZ without cast or metal. Dots mark the fixed operating point</sub>
+<b>Figure 3.</b> ROC curves for FracAtlas (internal), GRAZ (external) and GRAZ without cast or metal. Dots mark the fixed operating point
 </p>
 <br>
 
@@ -120,7 +120,7 @@ Among casted images the model flags 99.5% of fractured cases and also nearly eve
 <p align="center">
 <img src="FractureDetection/fig/cast_shortcut.png" alt="Cast shortcut">
 <br>
-<sub><b>Figure 4.</b> Score distributions without and with a cast. The vertical line is the operating point</sub>
+<b>Figure 4.</b> Score distributions without and with a cast. The vertical line is the operating point
 </p>
 <br>
 
@@ -139,7 +139,7 @@ Grad-CAM peaks inside the annotated box for 63.7% (59.6 to 67.8) of detected fra
 <p align="center">
 <img src="FractureDetection/fig/grid_detected.png" alt="Detected">
 <br>
-<sub><b>Figure 5.</b> Correctly detected fractures, with the annotated box in green and the Grad-CAM overlay below. Random sample</sub>
+<b>Figure 5.</b> Correctly detected fractures, with the annotated box in green and the Grad-CAM overlay below. Random sample
 </p>
 <br>
 
@@ -150,7 +150,7 @@ Grad-CAM peaks inside the annotated box for 63.7% (59.6 to 67.8) of detected fra
 <p align="center">
 <img src="FractureDetection/fig/grid_missed.png" alt="Missed">
 <br>
-<sub><b>Figure 6.</b> Missed fractures, sampled at random</sub>
+<b>Figure 6.</b> Missed fractures, sampled at random
 </p>
 <br>
 
@@ -161,7 +161,7 @@ Grad-CAM peaks inside the annotated box for 63.7% (59.6 to 67.8) of detected fra
 <p align="center">
 <img src="FractureDetection/fig/grid_false_alarms.png" alt="False alarms">
 <br>
-<sub><b>Figure 7.</b> The six highest-scoring non-fractured images, which are the model's most confident false alarms</sub>
+<b>Figure 7.</b> The six highest-scoring non-fractured images, which are the model's most confident false alarms
 </p>
 <br>
 
@@ -187,7 +187,7 @@ The smallest quartile of fractures by relative box area (180 images) is detected
 | Fine head, no boxes (control) | 0.936 | 0.794 | +0.000 (-0.045 to +0.045) |
 | Oversample small x3 | 0.932 | 0.761 (0.688 to 0.826) | -0.033 (-0.086 to +0.015) |
 
-<sub><b>Table 3.</b> Sensitivity on the smallest-fracture quartile at the fixed operating point, with paired 95% intervals</sub>
+<b>Table 3.</b> Sensitivity on the smallest-fracture quartile at the fixed operating point, with paired 95% intervals
 
 </div>
 
@@ -198,7 +198,7 @@ The honest reading is that the experiment is inconclusive, and it should not be 
 <p align="center">
 <img src="FractureDetection/fig/small_fracture_runs.png" alt="Small fracture runs">
 <br>
-<sub><b>Figure 8.</b> Small-fracture sensitivity by run with 95% intervals. The shaded band spans the two baseline seeds</sub>
+<b>Figure 8.</b> Small-fracture sensitivity by run with 95% intervals. The shaded band spans the two baseline seeds
 </p>
 <br>
 
@@ -209,7 +209,7 @@ The honest reading is that the experiment is inconclusive, and it should not be 
 <p align="center">
 <img src="FractureDetection/fig/grid_small.png" alt="Small fracture grid">
 <br>
-<sub><b>Figure 9.</b> Smallest-quartile fractures, three detected (left) and three missed (right), random sample</sub>
+<b>Figure 9.</b> Smallest-quartile fractures, three detected (left) and three missed (right), random sample
 </p>
 <br>
 
@@ -220,7 +220,7 @@ The honest reading is that the experiment is inconclusive, and it should not be 
 <p align="center">
 <img src="FractureDetection/fig/gradcam_small.gif" alt="Small fracture animation" width="85%">
 <br>
-<sub><b>Figure 10.</b> A detected and a missed small fracture. The annotated box appears first and the Grad-CAM heatmap follows. In the missed case the heatmap sits away from the box</sub>
+<b>Figure 10.</b> A detected and a missed small fracture. The annotated box appears first and the Grad-CAM heatmap follows. In the missed case the heatmap sits away from the box
 </p>
 <br>
 
@@ -239,7 +239,7 @@ Under those assumptions the internal operating point (sensitivity 0.81, specific
 <p align="center">
 <img src="FractureDetection/fig/ed_simulation.png" alt="ED simulation">
 <br>
-<sub><b>Figure 11.</b> Illustrative ED simulation at a 5% usual miss rate. A comparison of assumptions and not a prediction</sub>
+<b>Figure 11.</b> Illustrative ED simulation at a 5% usual miss rate. A comparison of assumptions and not a prediction
 </p>
 <br>
 
@@ -252,7 +252,7 @@ The simulation is site-parameterised, with functions that calibrate arrivals, sh
 <p align="center">
 <img src="FractureDetection/fig/breakeven.png" alt="Break-even">
 <br>
-<sub><b>Figure 12.</b> Illustrative break-even grid. Costs and usual miss rates are axes and none of the values are sourced</sub>
+<b>Figure 12.</b> Illustrative break-even grid. Costs and usual miss rates are axes and none of the values are sourced
 </p>
 <br>
 
