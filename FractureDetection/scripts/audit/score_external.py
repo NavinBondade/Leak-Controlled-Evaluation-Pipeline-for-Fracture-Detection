@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from fracai.metrics import thr_at_spec
+from fracai.metrics import shift_and_average
 from fracai.train import build_model, dev, load_cache, predict
 
 OUT = Path("results/ext")
@@ -19,7 +19,7 @@ arr = load_cache("graz", 512)
 val = pd.read_csv("results/val_fracatlas.csv")
 idx = np.arange(len(meta))
 
-shifted = []
+logits = []
 for k in range(5):
     f = OUT / f"graz_logit_model{k}.npy"
     if not f.exists():
@@ -29,10 +29,9 @@ for k in range(5):
         del model
         torch.cuda.empty_cache()
         print(f"model {k} scored", flush=True)
-    v = val[val.test_fold == k]
-    shifted.append(np.load(f) - thr_at_spec(v.y, v.score, 0.90))
+    logits.append(np.load(f))
 
-meta["score"] = np.mean(shifted, axis=0)
+meta["score"], shifted = shift_and_average(logits, val, 0.90)
 for k in range(5):
     meta[f"shifted_{k}"] = shifted[k]
 meta.to_csv("results/ext_graz_scores.csv", index=False)

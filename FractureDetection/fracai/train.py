@@ -105,6 +105,14 @@ def _save_atomic(obj, path):
     os.replace(tmp, path)  # atomic write
 
 
+def fold_split(df, k):
+    """Row labels (train, validation, test) for fold k: test is fold k, validation is fold (k+1) % 5, train the rest."""
+    tr = df.index[~df.fold.isin([k, (k + 1) % 5])].values
+    va = df.index[df.fold == (k + 1) % 5].values
+    te = df.index[df.fold == k].values
+    return tr, va, te
+
+
 def train_fold(
     arr,
     df,
@@ -127,9 +135,7 @@ def train_fold(
     An auxiliary 1x1 head predicts a coarse fracture map from the last-stage features; it is dropped before saving/inference."""
     torch.manual_seed(seed + k)
     rng = np.random.default_rng(seed + k)
-    tr = df.index[~df.fold.isin([k, (k + 1) % 5])].values
-    va = df.index[df.fold == (k + 1) % 5].values
-    te = df.index[df.fold == k].values
+    tr, va, te = fold_split(df, k)
     extra = tr[small[tr]] if (small is not None and small_rep > 1) else tr[:0]
     pool = np.concatenate([tr] + [extra] * (small_rep - 1)) if len(extra) else tr
     model = build_model(arch)

@@ -108,7 +108,9 @@ for ax, col, title in [
 w = 0.38
 for j, (u, c) in enumerate([(0.75, BLUE), (0.95, RED)]):
     d = sim[(sim.reporter_utilisation == u) & sim.scenario.isin(order)].set_index("scenario").loc[order]
-    axes[2].bar(np.arange(5) + (j - 0.5) * w, d.undetected_hours_per_year, w, color=c, label=f"reporter {int(u * 100)}% busy")
+    axes[2].bar(
+        np.arange(5) + (j - 0.5) * w, d.undetected_hours_per_year, w, color=c, label=f"reporter {int(u * 100)}% busy"
+    )
 axes[2].set_xticks(range(5), names)
 axes[2].set_title("(c) Undetected fracture-hours\n(a year)")
 axes[2].legend(loc="upper right")

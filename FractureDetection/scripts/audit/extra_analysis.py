@@ -1,11 +1,16 @@
-"""Extra GRAZ analyses on the saved external scores. Writes results/extra_*.csv."""
+"""Extra GRAZ analyses on the saved external scores. Writes extra_*.csv to results/ or to the folder given as argument."""
+
+import sys
+from pathlib import Path
 
 import pandas as pd
 
 from fracai.data import GRAZ
 from fracai.metrics import group_bootstrap, safe_auc, sens_spec
 
-NB = 300
+NB = 1000
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("results")
+OUT.mkdir(parents=True, exist_ok=True)
 raw = pd.read_csv(
     GRAZ / "dataset.csv", usecols=["filestem", "study_number", "initial_exam", "ao_classification", "pixel_spacing"]
 )
@@ -26,10 +31,10 @@ for k, g in pos.groupby("ao"):
     if g.group.nunique() >= 30:
         rows.append({"ao_class": k, "n": len(g), "sens": fmt(group_bootstrap(g, sens, "group", NB))})
 t1 = pd.DataFrame(rows).sort_values("n", ascending=False)
-t1.to_csv("results/extra_ao_sensitivity.csv", index=False)
+t1.to_csv(OUT / "extra_ao_sensitivity.csv", index=False)
 print("1. Sensitivity by AO class (initial exams, >=30 patients):\n", t1.to_string(index=False))
 
-# (device analysis dropped: every GRAZ image is from one Siemens machine, so a device shortcut cannot be tested)
+# (device analysis: 20,215 GRAZ images are Siemens and 112 are Agfa, so a device shortcut is testable only on those 112; see a3_device.py)
 
 # 3. cast effect within the same label: negatives and positives separately
 print("\n3. Mean score by cast status, within label (initial and follow-up pooled):")
@@ -75,7 +80,7 @@ for lab, col in [
         }
     )
 t4 = pd.DataFrame(rows)
-t4.to_csv("results/extra_study_level.csv", index=False)
+t4.to_csv(OUT / "extra_study_level.csv", index=False)
 print(f"\n4. Study-level (first visits with both views, {len(both)} studies):\n", t4.to_string(index=False))
 
 # 5. same-patient follow-ups: does the model score a fractured wrist lower or higher once casted/treated?

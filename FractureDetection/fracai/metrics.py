@@ -12,9 +12,24 @@ def sens_spec(y, s, thr):
 
 
 def thr_at_spec(y, s, spec=0.90):
-    """Lowest threshold whose specificity on (y, s) is >= spec. Fit on validation data only."""
+    """Threshold at the `spec` quantile of the negative scores ("higher" method, so it is one of the scores).
+    Specificity on (y, s) is approximately `spec`, not guaranteed >= spec: without ties it lies within
+    1/n_negatives of it and can fall just below (0.899 to 0.900 on our validation folds). Fit on validation data only."""
     neg = np.sort(np.asarray(s)[np.asarray(y) == 0])
     return np.quantile(neg, spec, method="higher")
+
+
+def fold_thresholds(val, spec=0.90):
+    """Operating threshold per fold model, from that model's validation rows (column test_fold) only."""
+    return {k: thr_at_spec(v.y, v.score, spec) for k, v in val.groupby("test_fold")}
+
+
+def shift_and_average(logits, val, spec=0.90):
+    """External scoring: shift each fold model's logits by its own validation threshold so that 0 is the
+    operating point, then average. logits[k] belongs to the model tested on fold k. Returns (mean, shifted)."""
+    thr = fold_thresholds(val, spec)
+    shifted = [np.asarray(lg) - thr[k] for k, lg in enumerate(logits)]
+    return np.mean(shifted, axis=0), shifted
 
 
 def thr_youden(y, s):

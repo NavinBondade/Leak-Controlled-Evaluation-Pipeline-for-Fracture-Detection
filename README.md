@@ -1,44 +1,36 @@
 <div align="center">
 
-![Leak-Controlled Fracture Detection & Evaluation](FractureDetection/fig/banner.png)
+![What a Fracture Detector Really Learns: A Leak-Controlled Audit](FractureDetection/fig/banner.png)
 
 </div>
 
-# Leak-Controlled Fracture Detection & Evaluation
+# What a Fracture Detector Really Learns: A Leak-Controlled Audit
 
-How much of the accuracy reported for fracture-detection models is a property of the model, and how much is a property of the way it was evaluated? This repository answers that question for one concrete case. A standard ConvNeXt-Tiny classifier is trained on the public FracAtlas dataset under a split that keeps near-duplicate images together, its decision threshold is fixed in advance at 90% specificity, and it is then applied without any retraining or threshold change to GRAZPEDWRI-DX, a paediatric wrist dataset from a different institution. The same model scores an AUC of 0.923 on its own data, 0.825 on the external data, 0.744 once images with a cast or metal are removed, and 0.697 on first-visit examinations. Most of the gap between the external headline and the cleaner subsets is explained by a shortcut: the model treats a plaster cast as evidence of fracture. The result is not a better fracture detector. It is a measured account of how far a strong internal number can fall when the evaluation is designed to make an optimistic result hard to obtain.
+## 1. Introduction
 
-### Contributions
-
-Compared with an evaluation confined to a random split of FracAtlas, this work differs in three concrete ways.
-
-1. **Leakage and threshold control.** Near-duplicate radiographs are grouped before splitting, every FracAtlas image is scored by a model that never saw it, and the operating threshold is fixed on validation data and never refitted, including on the external set.
-2. **External transfer with artefact audits.** The model is tested on 20,327 external images with patient-level confidence intervals, and the external result is broken down by cast, metal, first visit, view and fracture type, which exposes a cast shortcut that the development data cannot reveal.
-3. **Reproducible audits of what the measurements can and cannot resolve.** The pipeline includes saliency and occlusion audits, a resolution test, a pre-written decision rule for a small-fracture intervention, and an illustrative emergency-department (ED) simulation, all released as code so the same questions can be asked of any other fracture model.
-
-### What this work does not show
-
-This is a retrospective evaluation on public data and not a clinical validation. It does not show that the model would help clinicians, and it is not a medical device. The small-fracture experiments are inconclusive: the unmodified model changed by 0.033 in small-fracture sensitivity between two random seeds, which is as large as the gains being tested, so the main finding of that section is about how many repeated runs such a claim needs. The ED simulation uses assumed inputs (for example 120 departments and a 5% usual miss rate) and illustrates a mechanism; it predicts nothing about any real hospital.
-
-The rest of the report follows the argument in order: why existing numbers are hard to trust, how the data and evaluation were set up, what the model achieves internally and externally, where it fails and why, what the small-fracture and simulation experiments can and cannot say, and what remains unknown.
+This research project audits what a standard fracture classifier learns from radiographs. A ConvNeXt-Tiny model was trained on FracAtlas under a split that keeps near-duplicate images together. Its decision threshold was fixed in advance on validation data. The model was then tested once on 20,327 paediatric wrist images from GRAZPEDWRI-DX, with no retraining and no threshold change. The classifier reaches an AUC of 0.923 on FracAtlas and 0.825 on GRAZPEDWRI-DX. On first-visit exams the external AUC falls to 0.697, and sensitivity falls to 0.540. The central finding is a treatment shortcut. Within the same patient, a follow-up image with a cast scores 4.2 logits higher than one without (95% CI 4.0 to 4.3). A fracture at first presentation raises the score by only about 2.1 logits. Follow-up exams score high even without a cast. Small fractures and patients aged 16 and over are further weak spots. A random internal split reveals none of these failures.
 
 ---
 
-## Background and Motivation
+## 2. Background
 
-Fracture detection on plain radiographs is one of the most studied applications of deep learning in medical imaging, and many published models report internal AUCs above 0.9. Detection models have been trained and evaluated on paediatric wrist radiographs [7, 8], and two-stage designs have been proposed for subtle fractures such as those of the scaphoid [9]. Two questions are asked much less often than they should be. The first is whether a model still works on images from another hospital, another population and another X-ray machine. The second is whether the reported accuracy comes from the fracture itself or from something that merely travels with it, such as a cast, a metal implant or the way an image was cropped. Both are well-known failure modes of medical imaging models, described in the shortcut-learning [5] and cross-site generalisation [6] literature, and both are easy to miss when a model is only tested on a random split of its own development data.
+Many deep-learning fracture models report internal AUCs above 0.9 on plain radiographs. Detection models have been trained on paediatric wrist radiographs [7, 8], and two-stage designs target subtle scaphoid fractures [9]. Three terms frame this study.
 
-A random split adds a third, quieter problem. FracAtlas has no patient identifiers, and some of its images are near-identical scans of the same limb. If one copy is used for training and another for testing, the test measures recall of a seen image rather than detection of an unseen fracture. We call this leakage.
+**Leakage** occurs when near-identical images of the same limb fall on both sides of a train and test split. The test then measures recall of a seen image, not detection of an unseen fracture. FracAtlas has no patient identifiers, so leakage must be controlled by image similarity.
 
-This repository therefore builds the evaluation, not a better model. The classifier is deliberately a commodity one. Everything around it is designed to make an optimistic result harder to obtain: near-duplicates are grouped before splitting, the threshold is fixed on validation data and never touched again, the external test uses patient-level resampling for its intervals, and each audit is written so that it could change the conclusion. The work is similar in spirit to prospective and multi-site evaluations of fracture AI, but it is not the same thing. It uses only public retrospective data, it makes no claim about clinical benefit, and it does not replace the prospective evidence those studies are designed to produce. The next section describes the two datasets and how each was grouped, since the grouping determines what every later confidence interval means.
+A **shortcut** is a feature that correlates with the label in the training data but is not the property of interest [5]. Casts, implants and image crops are common candidates in fracture imaging.
+
+**External validation** tests a fixed model on data from another institution, population and scanner [6]. A model that relies on shortcuts often loses accuracy there. This study treats the classifier as deliberately standard. Its contribution is the audit around the model.
 
 ---
 
-## Datasets and Preprocessing
+## 3. Datasets and Preprocessing
 
-The development and audit set is FracAtlas [1], which contains 4,083 radiographs, of which 719 show a fracture (17.6%). The images cover the leg (2,124), hand (1,281), a mixed group in which several body parts are labelled (398), hip (179) and shoulder (101), and every fractured image carries a bounding-box annotation of the fracture. Because FracAtlas has no patient identifier, patient-level grouping is not possible. Groups were instead formed by linking any two images whose 256-bit perceptual hashes differ by at most 30 bits, and by linking consecutive images that are both flagged as multi-scan and share a body part. This produces 3,828 groups, of which 178 contain more than one image. Whole groups are assigned to a single fold, using five folds stratified by label and body part.
+The development set is FracAtlas [1]. It contains 4,083 radiographs, and 719 of them show a fracture (17.6%). The images cover the leg (2,124), hand (1,281), a mixed group with several labelled body parts (398), hip (179) and shoulder (101). Every fractured image carries a bounding box around the fracture. FracAtlas has no patient identifier, so the pipeline groups images instead. It links any two images whose 256-bit perceptual hashes differ by at most 30 bits. It also links consecutive images that are both flagged as multi-scan and share a body part. This produces 3,828 groups, of which 178 contain more than one image. Whole groups go to a single fold, with five folds stratified by label and body part.
 
-The external set is GRAZPEDWRI-DX [2], 20,327 paediatric wrist images from 6,091 patients, all acquired on a single Siemens machine. The fracture label is the dataset's `fracture_visible` field (a blank field is read as no fracture), which gives 13,550 fractured images (66.7%). Patient identifiers are available, so every external confidence interval resamples whole patients. Because fracture prevalence differs so much between the datasets (17.6% against 66.7%), only AUC, sensitivity and specificity are compared across them; predictive values would mostly reflect prevalence. Table 1 summarises the two sets.
+The external set is GRAZPEDWRI-DX [2]. It holds 20,327 paediatric wrist images from 6,091 patients. Of these, 20,215 images come from Siemens equipment and 112 from Agfa equipment. The fracture label is the dataset's `fracture_visible` field, and a blank field counts as no fracture. This gives 13,550 fractured images (66.7%). The dataset also supplies `cast`, `metal`, `initial_exam`, age, sex and AO fracture class. An **initial exam** is an image whose `initial_exam` field equals 1; all other images count as **follow-ups**. Every external interval resamples whole patients.
+
+Prevalence differs strongly between the two sets (17.6% against 66.7%). The study therefore compares only AUC, sensitivity and specificity across them. Table 1 summarises the two sets.
 
 <div align="center">
 
@@ -47,20 +39,29 @@ The external set is GRAZPEDWRI-DX [2], 20,327 paediatric wrist images from 6,091
 | Images | 4,083 | 20,327 |
 | Fractured | 719 (17.6%) | 13,550 (66.7%) |
 | Anatomy | leg, hand, hip, shoulder, mixed | paediatric wrist only |
+| Equipment | mixed | Siemens (20,215), Agfa (112) |
 | Grouping | perceptual-hash near-duplicates and multi-scan runs (3,828 groups) | patient (6,091 patients) |
 | Role | five-fold training and audits | one-shot external test |
 
-<b>Table 1.</b> The two datasets. Groups are the units that are kept within one fold and resampled in every bootstrap interval
+<b>Table 1.</b> The two datasets. Groups are kept within one fold and resampled in every bootstrap interval
 
 </div>
 
-Images are resized so that the longer side is 512 pixels and padded to 512 x 512, which preserves the aspect ratio. Training uses a light augmentation (rotation up to 10 degrees, scaling up to 10%, small translations, and brightness and contrast changes) and no flips, because laterality carries information in some views. Access to the data is through the original publications [1, 2]. The licence terms of both datasets have not been verified by this project and should be checked before any redistribution. With the data fixed, the next section describes how a score becomes a decision, which is where most of the evaluation design lies.
+Images are resized so that the longer side is 512 pixels and padded to 512 x 512. Training uses light augmentation: rotation up to 10 degrees, scaling up to 10%, small translations, and brightness and contrast changes. It uses no flips, because laterality carries information in some views.
 
 ---
 
-## Pipeline
+## 4. Evaluation Design
 
-The pipeline runs from raw images to an external verdict in the order shown in Figure 1. It is built around one principle: no number reported here was produced by a model, or a threshold, that had seen the images being scored.
+The classifier is a ConvNeXt-Tiny [3] pretrained on ImageNet, with one input channel and one output logit. It trains for up to 12 epochs with AdamW (learning rate 1e-4, weight decay 0.05), a one-cycle schedule and batch size 16. Training stops early when validation AUC has not improved for 4 epochs.
+
+Training uses five folds. For fold k, the model trains on three folds and uses fold (k+1) mod 5 for early stopping and threshold setting. It is then tested on fold k. Each FracAtlas image is therefore scored once, by the one fold model that neither trained on it nor validated on it. These out-of-fold scores support every internal result.
+
+The **operating point** is the decision threshold, fixed before any test data is seen. For each fold model it is the 90th percentile of the scores of non-fractured validation images. This gives validation specificity of 0.899 to 0.900, approximately 90%. Each model's logits are shifted so that its threshold sits at zero. An image is **flagged** when its shifted score is zero or above. A flagged fractured image is **detected**, and an unflagged fractured image is **missed**.
+
+The **five-fold ensemble** score is the mean of the five fold models' shifted logits. The pipeline uses it for every external image, with the cut-off of zero and no refitting. Internally the five-fold ensemble is never used, because the other four models trained or validated on each image. The internal headline AUC pools the shifted out-of-fold scores of all 4,083 images.
+
+Every interval is a 95% percentile bootstrap with 1,000 draws that resamples whole groups. Groups are near-duplicate groups in FracAtlas and patients in GRAZPEDWRI-DX. Two exceptions use fewer draws: the resolution test (300) and the feature-probe intervals (200). Paired comparisons of two training runs reuse the same resampled groups for both. Figure 1 shows the full pipeline.
 
 <div align="center">
 
@@ -73,13 +74,7 @@ The pipeline runs from raw images to an external verdict in the order shown in F
 
 </div>
 
-Training uses five folds. For fold k, the model is trained on three folds, uses fold (k+1) mod 5 for early stopping and threshold setting, and is tested on fold k. Each FracAtlas image is therefore scored exactly once, by the one model that neither trained on it nor used it for validation. These are the out-of-fold scores on which all internal results are computed, over all 4,083 images.
-
-The **operating point** is the decision threshold, and it is fixed before any test data is seen. For each fold model it is the lowest score at which specificity on that model's validation fold reaches 90%. Each model's scores are then shifted so that its threshold sits at zero, and an image is **flagged** (called fractured) when its shifted score is zero or above. A fractured image that is flagged is **detected**; a fractured image that is not flagged is **missed**. On GRAZPEDWRI-DX the external score of an image is the mean of the five fold models' shifted scores, flagged by the same rule, with no refitting of any kind. This step matters most, because refitting a threshold on the target data hides exactly the transfer problem the test is meant to expose.
-
-The classifier is a ConvNeXt-Tiny [3] pretrained on ImageNet, with a single input channel and a single-logit output. It is trained for up to 12 epochs with AdamW (learning rate 1e-4, weight decay 0.05), a one-cycle learning-rate schedule and a batch size of 16, and training stops early when validation AUC has not improved for 4 epochs. Every interval in this report is a 95% percentile bootstrap with 1,000 draws in which whole groups are resampled: FracAtlas near-duplicate groups internally and patients externally. When two training runs are compared, the same resampled groups are used for both, which gives a paired interval for their difference.
-
-Around this core the pipeline adds Grad-CAM [4] and occlusion audits, a resolution test, an auxiliary box-supervision head used in the small-fracture experiments, and a break-even analysis and ED pathway simulation. Each lives in its own script under `FractureDetection/scripts/`, and the shared logic is in `FractureDetection/fracai/`. Figure 2 shows what the network computes on a single image before any of these audits are applied.
+Figure 1 places every audit after the threshold is fixed. No reported number comes from a model or threshold that had seen the scored images. Figure 2 shows what the network computes on a single image.
 
 <div align="center">
 
@@ -92,25 +87,25 @@ Around this core the pipeline adds Grad-CAM [4] and occlusion audits, a resoluti
 
 </div>
 
-The figure is a visual guide rather than evidence; whether the model attends to the fracture is tested quantitatively later. The results begin with the number most papers would stop at, the internal score.
+Figure 2 is a visual guide, not evidence. Sections 7 and 9 test quantitatively where the model looks.
 
 ---
 
-## Results
+## 5. Internal Performance
 
-### Internal performance
+The pooled out-of-fold AUC on FracAtlas is 0.923 (95% CI 0.910 to 0.935). This pools threshold-shifted scores. The raw pooled AUC is 0.911, and the mean of the five per-fold AUCs is 0.932. At the operating point, sensitivity is 0.808 (581 of 719 fractures detected) and specificity is 0.897.
 
-On the leak-controlled FracAtlas split the out-of-fold AUC is 0.923 (95% CI 0.910 to 0.935), computed on all 4,083 images. At the fixed operating point sensitivity is 0.808 (581 of 719 fractures detected) and specificity is 0.897. Two checks suggest that this figure is not driven by an obvious shortcut. FracAtlas marks 99 images as containing hardware (metal implants), 97 of them fractured. Removing them moves the AUC only to 0.915 (0.899 to 0.928), and the hardware flag used alone as a predictor reaches an AUC of only 0.567. A predictor that uses only the image-size class reaches 0.536.
+Two hardware checks find no obvious shortcut inside FracAtlas. FracAtlas marks 99 images as containing metal implants, and 97 of them are fractured. Removing them moves the AUC to 0.915 (0.899 to 0.928). The hardware flag alone predicts fracture with an AUC of 0.567. Image-size class alone reaches 0.536.
 
-Performance is not uniform across fractures. Ranking the 719 fractured images by the longer side of their annotated box, the smallest quartile (180 images) is detected 72.2% of the time (65.6 to 78.8), against 87.2% for the largest quartile. This gap motivates the small-fracture experiments later in the report.
+A naive split that ignores near-duplicate groups gave an AUC of 0.931, against 0.923 for the controlled split. The intervals overlap and each split was trained once, so this comparison shows no measurable leakage inflation.
 
-Grouping matters for credibility, but its effect on this dataset could not be measured precisely. A naive split that assigns images to folds at random, ignoring near-duplicate groups, gave an AUC of 0.931 against 0.923 for the controlled split, with overlapping intervals. Because each split was trained once and the two use different fold assignments, no leakage inflation is claimed from this comparison. Subgroups with fewer than 30 fractured or 30 non-fractured images are flagged as unreliable; hip and shoulder each have only 10 fractured images and fall in this category.
+Performance varies with fracture size. This study defines a **small fracture** as a fractured image whose box area, relative to the image, lies in the smallest quartile. This gives 180 images. The model detects 76.1% of small fractures (69.3 to 82.2) and 88.9% of the largest quartile (83.9 to 93.2). Section 10 returns to this gap.
 
-By this standard the internal result is strong. The question is whether it survives a change of hospital, population and scanner.
+---
 
-### External transfer
+## 6. External Transfer
 
-On GRAZPEDWRI-DX, with the same five models, the same threshold rule and no refitting, the AUC is 0.825 (0.816 to 0.833). Read alone this looks like a modest drop. Table 2 shows that it is not. The first row gives the closest internal comparison, the 1,281 FracAtlas hand images, and the remaining rows break the external set into subsets defined by labels supplied with GRAZPEDWRI-DX: **cast** and **metal** are the dataset's `cast` and `metal` annotations, and **initial exams** are images whose `initial_exam` field equals 1 (10,861 images from 4,929 patients, 42% fractured). Images with a blank `initial_exam` field (9,466) are treated as follow-ups, which is an assumption.
+On GRAZPEDWRI-DX the five-fold ensemble reaches an AUC of 0.825 (0.816 to 0.833). Table 2 breaks this number down. The first row gives the closest internal comparison, the 1,281 FracAtlas hand images. The other rows use subsets defined by the GRAZPEDWRI-DX `cast`, `metal` and `initial_exam` fields.
 
 <div align="center">
 
@@ -126,9 +121,11 @@ On GRAZPEDWRI-DX, with the same five models, the same threshold rule and no refi
 
 </div>
 
-Removing the 6,214 images that carry a cast or metal leaves 14,113 images, and the AUC falls from 0.825 to 0.744. Restricting to initial exams, the situation in which a clinician would actually want a second reader, lowers it further to 0.697, with a sensitivity of 0.540. Almost no initial exam carries a cast (2 of 10,861 images) or metal (17), so the further fall from 0.744 to 0.697 is not a cast effect; it reflects that first-visit fractures are harder for this model than the mixture of first and follow-up images that remains after removing casts.
+Removing the 6,214 images with a cast or metal leaves 14,113 images, and the AUC falls to 0.744. Initial exams alone give 0.697, with sensitivity 0.540. Both subsets were chosen after the results were seen. Almost no initial exam carries a cast (2 of 10,861 images) or metal (17). The fall from 0.744 to 0.697 is therefore not a cast effect. First-visit fractures are simply harder for this model.
 
-Two further checks show that the problem is the model's ranking of images and not only its threshold. Refitting the threshold on GRAZPEDWRI-DX itself to give 90% specificity, a step that is deliberately excluded from the main analysis, yields a sensitivity of only 0.673. And the five fold models, scored individually, give external AUCs from 0.753 to 0.833, so a single trained model would have given an unstable external estimate; the averaged score reported in Table 2 (0.825) is higher than four of the five individual models. Figure 3 shows the same contrast as full ROC curves.
+The problem lies in the ranking of images, not only in the threshold. Refitting the threshold on GRAZPEDWRI-DX to 90% specificity yields a sensitivity of only 0.673. This refit is excluded from the main analysis. The five fold models, scored individually, give external AUCs from 0.753 to 0.833. Their external specificity at their own cut-offs ranges from 0.356 to 0.785. A single trained model would therefore give an unstable external estimate. The five-fold ensemble's cut-off of zero was never checked on held-out external data.
+
+The data show no device effect, though only a large one could be detected. The 112 Agfa images give an AUC of 0.774 (0.640 to 0.892), against 0.825 for Siemens images. Within the same patient, label and view, Agfa images score 0.40 logits lower than Siemens images (-1.32 to +0.48). Figure 3 shows the internal and external contrast as ROC curves.
 
 <div align="center">
 
@@ -141,43 +138,116 @@ Two further checks show that the problem is the model's ranking of images and no
 
 </div>
 
-The external curve without casts or metal lies clearly below the full external curve, which means that casted and metal-containing images were raising the headline number. The next section shows why.
+In Figure 3 the external curve without casts or metal lies clearly below the full external curve. Casted and metal-containing images raise the headline number. Section 7 shows why.
 
-### The cast shortcut
+---
 
-Among the 5,776 casted images (96% fractured), the model flags 99.5% of the fractured ones and also nearly all of the non-fractured ones, a specificity of 0.017. The model is therefore not detecting fractures in casted wrists; it is detecting casts. Comparing mean scores within each label makes this explicit. Among non-fractured images, the 237 with a cast score on average 7.7 logits higher than the 6,540 without. Among fractured images, a cast raises the mean score by 5.3 logits. For comparison, the effect of the fracture itself, the difference in mean score between fractured and non-fractured images without a cast, is only about 2.8 logits. A cast moves the score more than a fracture does.
+## 7. The Cast Shortcut
+
+### 7.1 A confounded first look
+
+GRAZPEDWRI-DX contains 5,776 casted images, and 96% of them are fractured. The model flags 99.5% of the fractured casted wrists and 98.3% of the non-fractured ones. The model's own score separates cast from no cast with an AUC of 0.932. It separates fracture from no fracture with an AUC of 0.825.
+
+A pooled comparison of casted and non-casted images is confounded. All 237 casted non-fractured images are follow-up exams. Cast and initial exam are almost perfectly separated. Non-cast follow-ups already score high. Figure 4a shows the mean score in each cell.
 
 <div align="center">
 
 <p align="center">
-<img src="FractureDetection/fig/cast_shortcut.png" alt="Cast shortcut">
+<img src="FractureDetection/fig/cast_effect.png" alt="Cast effect">
 <br>
-<b>Figure 4.</b> Distributions of the external score for images without and with a cast. The vertical line is the operating point
+<b>Figure 4.</b> (a) Mean ensemble score by label, exam type and cast. (b) Within-patient cast effect in fractured follow-up wrists, overall and by view, with 95% patient-bootstrap intervals. Zero is the decision threshold
 </p>
 <br>
 
 </div>
 
-Figure 4 shows that almost the entire casted distribution lies above the operating point, whatever the label. This is a textbook shortcut in the sense of [5]: a feature that correlates with the label in the data but is not the property of interest. It is invisible during internal evaluation because FracAtlas has no cast label, so no FracAtlas audit could have found it. The same shortcut explains why follow-up visits look better than first visits: among fractured images, 54% are flagged at first visits and 90% at follow-ups, where casts are common. Having separated out the cast effect, the remaining question is which first-visit fractures the model misses.
+Figure 4a shows three steps. At initial exams without a cast, fractured images score about 2.1 logits above non-fractured ones (+0.93 against -1.16). Among non-cast follow-ups the two labels score almost the same (+2.88 against +2.83, a gap of about 0.05). A cast then adds about 4 logits for both labels. Within follow-ups, the cast raises the mean by 3.84 logits for non-fractured images (2.71 to 5.13; 244 against 237 images). It raises the mean by 4.21 for fractured images (4.04 to 4.37). The model therefore responds to treatment status. Follow-up exams score high even without a cast.
 
-### View and fracture type
+### 7.2 Within-patient test
 
-On initial exams the model is weakest on frontal views, with an AUC of 0.61 and a sensitivity of 31% (5,370 images), against 0.79 and 73% for lateral views (5,439 images). The cause was not tested. A natural remedy is to combine the two views of the same study. This was tested on the 4,951 first-visit studies that have both views, where the lateral view alone gives an AUC of 0.785 (0.773 to 0.796) and the frontal view alone 0.580. Neither simple combination rule helped: taking the maximum of the two scores gave 0.775 and the mean gave 0.743. A model trained on paired views might do better, but that was not tried.
+A within-patient design removes differences between patients. The test pairs follow-up images of the same patient, label and view, with and without a cast. In 946 patients with fractured wrists, a cast raises the score by 4.16 logits (3.99 to 4.31). The effect is +5.68 on frontal views and +2.61 on lateral views (Figure 4b). A patient fixed-effects regression gives a cast coefficient of +4.12 (3.97 to 4.27). The non-fractured within-patient contrast rests on only 10 patients (+6.65, 4.80 to 8.28). That estimate is too small a sample to rely on.
 
-By fracture type, using the AO classification supplied with GRAZPEDWRI-DX (truncated to its bone and type prefix, and shown only for classes with at least 30 patients), first-visit sensitivity is 51% for the most common class, 23r-M (3,173 images), 67% for 23-M, 49% for 23r-E and 79% for 22r-D (62 images). All analyses in this subsection are post hoc, and all use the threshold fixed in advance. Since the model fails on many first-visit fractures, it is worth asking whether, when it succeeds, it is looking at the fracture.
+In 96% of pairs the casted exam came first. Time since injury is therefore partly mixed into the cast effect. The cast effect is still about twice the fracture effect at first presentation.
 
-### Does the model look at the fracture?
+### 7.3 What the features encode
 
-This audit returns to FracAtlas, where every fracture has an annotated box. For each fractured image, Grad-CAM is computed on the last stage of the fold model that scored it, and the audit records whether the heatmap's single highest point (its peak) falls inside an annotated box enlarged by 16 pixels on each side. The peak falls inside the box for 63.7% (59.6 to 67.8) of the 581 detected fractures and only 29.7% (22.3 to 38.1) of the 138 missed ones. The chance level, the share of the image covered by the enlarged boxes, averages about 3%.
+A linear probe asks which properties the model's features make readable. The probe uses the 768-dimensional pooled features of each fold model on 3,967 GRAZPEDWRI-DX images. It holds out whole patients. Figure 5 compares it with a probe on raw pixels.
 
-An occlusion test on the 581 detected fractures checks the same question by intervention. Covering the annotated fracture with the image's median grey lowers the score by 2.42 logits on average (2.13 to 2.72), whereas covering up to five same-sized control patches, placed at random on bright (tissue or bone) areas away from the fracture, changes it by -0.01. Covering the fracture hurts the score more than the control patches in 77% of cases (73 to 80%). Two caveats apply. After the fracture is covered, 86% of these images are still flagged, so the decision is not carried by the fracture region alone. And the control patch is chosen by brightness, so it is not guaranteed to lie on bone. Saliency is useful for review and is not proof of mechanism. Figures 5 to 7 show what these numbers look like on individual images.
+<div align="center">
+
+<p align="center">
+<img src="FractureDetection/fig/probe_auc.png" alt="Probe AUC">
+<br>
+<b>Figure 5.</b> Patient-held-out probe AUC for cast, follow-up status and fracture, on model features and on raw pixels, with 95% patient-bootstrap intervals
+</p>
+<br>
+
+</div>
+
+The features encode cast almost perfectly (AUC 0.998). They encode follow-up status at 0.960, and at 0.913 among non-casted images. Fracture reaches 0.907, and only 0.779 among casted images. Raw pixels already read cast at 0.935. A probe therefore shows that cast is readable. It does not show that the classifier uses it.
+
+### 7.4 Grad-CAM on casted wrists
+
+Grad-CAM [4] from the five fold models was averaged on 600 GRAZPEDWRI-DX images, half casted and half not. Each image was split by intensity into dark (air), mid (soft tissue) and bright (bone-like) regions. On casted wrists, the share of the top 10% of CAM mass on bright pixels falls from 0.356 to 0.226. The difference is -0.13 (-0.16 to -0.10), while the bright area stays about 19% in both groups. The intensity split cannot separate plaster from bone, so this is a correlate. Figure 6 shows random examples.
+
+<div align="center">
+
+<p align="center">
+<img src="FractureDetection/fig/cam_cast_contact_sheet.png" alt="Grad-CAM on casted wrists" width="70%">
+<br>
+<b>Figure 6.</b> Grad-CAM (mean of the five fold models) on random GRAZPEDWRI-DX wrists: casted without fracture (top), casted with fracture (middle) and non-casted without fracture (bottom). The cross marks the CAM peak
+</p>
+<br>
+
+</div>
+
+In Figure 6 every casted image is flagged, including all six without a fracture. On casted wrists the heat often runs along the cast shell and the edge of the limb. In 9 of the 12 casted examples the peak falls on a border, dark or mid region rather than bone. In the reference row the peaks also sit often at the border, sometimes on a side marker. Two reference images are flagged, and one of them carries a metal plate (score +11.4). The sheet illustrates the pattern; the 600-image contrast above measures it.
+
+### 7.5 Perturbations
+
+Perturbations test which image content drives the high casted scores. Gaussian blur with sigma 4 lowers casted scores by 5.6 logits, against 1.3 for non-casted images. Masking the outer 10% border lowers them by 2.0, against 0.7. Masking the brightest 5% of pixels does not remove the effect. Every flat mask raises scores, including a shifted control mask, so this test is limited by a mask artefact. Even after blur or border removal, 83% to 97% of casted images stay flagged. These results point to fine texture and peripheral content. They are suggestive, not causal.
+
+### 7.6 Where the shortcut was learned
+
+FracAtlas has no cast field, so one reader inspected FracAtlas images. The reader was an AI model, not a radiologist. Casts or splints appeared in 16 of 60 random fractured images and in 1 of 60 correctly rejected non-fractured images (p < 0.001). In FracAtlas, a cast is therefore close to a fracture label. Among the 60 highest-scoring false alarms, only 5 showed a cast (against 1 of 60, p = 0.21). Metal, mostly external objects such as bangles and watches, was more common among false alarms (14 against 3, p = 0.007). FracAtlas plausibly taught the cast cue. This study does not prove that the GRAZPEDWRI-DX behaviour comes from it.
+
+---
+
+## 8. View, Fracture Type, Age and Sex
+
+On initial exams the model is weakest on frontal views. Frontal views give an AUC of 0.61 and a sensitivity of 31% (5,370 images). Lateral views give 0.79 and 73% (5,439 images). Combining the two views of one study did not help. On 4,951 first-visit studies with both views, the lateral view alone gives 0.785 (0.771 to 0.797) and the frontal view alone 0.580. The maximum of the two scores gives 0.775, and their mean gives 0.743.
+
+By AO fracture class, first-visit sensitivity is 51% for the most common class, 23r-M (3,173 images). It is 67% for 23-M, 49% for 23r-E and 79% for 22r-D (62 images). Counts are images; only classes with at least 30 patients are shown.
+
+Age and sex were tested on no-cast initial exams, where the cast and follow-up effects are absent. Figure 7 shows the result.
+
+<div align="center">
+
+<p align="center">
+<img src="FractureDetection/fig/age_sex.png" alt="Age and sex">
+<br>
+<b>Figure 7.</b> AUC (a) and sensitivity at the fixed threshold (b) on no-cast initial exams, by age band and sex, with 95% patient-bootstrap intervals
+</p>
+<br>
+
+</div>
+
+Every subgroup in Figure 7 lies between AUC 0.65 and 0.72. Patients aged 16 and over are weakest, with AUC 0.645 and sensitivity 0.45. Sensitivity falls steadily with age, from 0.58 under 6 years to 0.45 at 16 and over. Males reach an AUC of 0.717 and females 0.675, and their intervals do not overlap.
+
+---
+
+## 9. Where the Model Looks on Fractures
+
+This audit returns to FracAtlas, where every fracture has a box. For each fractured image, Grad-CAM is computed on the last stage of the fold model that scored it. The audit records whether the heatmap peak falls inside the box, enlarged by 16 pixels on each side. The peak falls inside for 63.7% (59.6 to 67.8) of the 581 detected fractures. It falls inside for only 29.7% (22.3 to 38.1) of the 138 missed ones. A uniformly placed peak would land in the enlarged box about 3% of the time. This chance level is generous to the model.
+
+An occlusion test checks the same question by intervention. Covering the fracture with the image's median grey lowers the score by 2.42 logits on average (2.13 to 2.72). Covering up to five same-sized control patches on bright areas away from the fracture raises the score by about 0.01 logits. Covering the fracture lowers the score more than the control patches in 77% of cases (73 to 80%). After the fracture is covered, 86% of these images are still flagged. Figures 8 to 10 show individual cases.
 
 <div align="center">
 
 <p align="center">
 <img src="FractureDetection/fig/grid_detected.png" alt="Detected">
 <br>
-<b>Figure 5.</b> Correctly detected fractures, randomly sampled, with the annotated box in green and the Grad-CAM overlay below
+<b>Figure 8.</b> Correctly detected fractures, randomly sampled, with the annotated box in green and the Grad-CAM overlay below
 </p>
 <br>
 
@@ -188,7 +258,7 @@ An occlusion test on the 581 detected fractures checks the same question by inte
 <p align="center">
 <img src="FractureDetection/fig/grid_missed.png" alt="Missed">
 <br>
-<b>Figure 6.</b> Missed fractures (fractured images scored below the operating point), randomly sampled
+<b>Figure 9.</b> Missed fractures (fractured images scored below the operating point), randomly sampled
 </p>
 <br>
 
@@ -199,25 +269,25 @@ An occlusion test on the 581 detected fractures checks the same question by inte
 <p align="center">
 <img src="FractureDetection/fig/grid_false_alarms.png" alt="False alarms">
 <br>
-<b>Figure 7.</b> The six highest-scoring non-fractured images, which are the model's most confident false alarms
+<b>Figure 10.</b> The six highest-scoring non-fractured images, which are the model's most confident false alarms
 </p>
 <br>
 
 </div>
 
-The random samples in Figures 5 and 6 are consistent with the pointing rates above: heatmaps for detected fractures tend to sit on the box, while those for missed fractures often do not. Many of the missed fractures are small, which leads to the one intervention this work attempted.
+In Figure 8 the heatmaps of detected fractures tend to sit on the box. In Figure 9 the heatmaps of missed fractures often do not. Figure 10 shows the confident false alarms that Section 7.6 examined. On average the model uses the fracture region, but the fracture alone does not carry the decision.
 
 ---
 
-## Small Fractures
+## 10. Small Fractures
 
-The internal results showed that small fractures are detected less often. This section asks whether that gap can be closed, and, as it turned out, whether a gain of the expected size could be measured at all with this design.
+Section 5 showed that small fractures are detected less often (76.1% against 88.9%). This section asks whether that gap can be closed and whether a realistic gain can be measured. The primary metric is sensitivity on the 180 small fractures at the fixed operating point, with the same folds in every run.
 
-For these experiments a **small fracture** is a FracAtlas fractured image whose annotated box area, as a fraction of the image, is at or below the 25th percentile of all fractured images. This gives 180 images, about 35 per fold. The definition differs from the one used in the internal results (longer side of the box, 72.2% sensitivity): the two groups have the same size but contain different images, because the target definition was changed when these experiments were designed. Under the area definition the baseline sensitivity is 0.761. The primary metric is sensitivity on these 180 images at the fixed operating point, with the same folds in every run.
+Resolution was ruled out first. Reducing images to 128 pixels and restoring them to 512 lowers the AUC from 0.923 to 0.850, mostly through false alarms. Small-fracture sensitivity does not fall (0.76 native, 0.77 to 0.80 degraded). Upscaling the input to 640 or 768 pixels adds nothing.
 
-Resolution was ruled out first. Reducing images to 128 pixels and restoring them to 512 lowers the overall AUC from 0.923 to 0.850, mostly by adding false alarms, but small-fracture sensitivity does not fall (0.76 native, 0.77 to 0.80 blurred). Upscaling the 512-pixel input to 640 or 768 pixels adds nothing. This tests only a model trained at 512 pixels; training at a higher resolution was not tried.
+Three interventions were tested. The first is an auxiliary head that predicts a coarse fracture-location map during training only. It is supervised with boxes on 100%, 25% or 10% of fractured training images. The second is a finer version of that head. The third oversamples small fractures three-fold. Each box run has a matching control that trains the same head without boxes. The unmodified baseline was trained with seeds 42 and 43 on the same folds.
 
-The interventions were an auxiliary head that predicts a coarse map of fracture location during training only (removed before scoring), supervised with the annotated boxes on 100%, 25% or 10% of fractured training images; a finer version of that head; and three-fold oversampling of small fractures. Each box run has a matching control in which the same head is trained without any box information. The unmodified baseline was trained with two random seeds (42 and 43) on the same folds. A decision rule was written down before the fine head, its control and the oversampling run were trained: an intervention would count only if the paired 95% interval for its small-fracture gain lay above zero against both baseline seeds, without losing more than 0.01 AUC or 0.03 specificity. The three box runs and the first control had already been seen when the rule was written, so they are exploratory. Table 3 compares every run with the seed-43 baseline, the stronger of the two.
+A decision rule was written down before the fine head, its control and the oversampling run were trained. An intervention counts only if its paired 95% interval lies above zero against both baseline seeds. It must also lose no more than 0.01 AUC or 0.03 specificity. The three box runs and the first control had already been seen, so they are exploratory. The rule was tightened once, after the seed-43 baseline appeared. Table 3 compares every run with the seed-43 baseline, the stronger of the two.
 
 <div align="center">
 
@@ -233,31 +303,31 @@ The interventions were an auxiliary head that predicts a coarse map of fracture 
 | Fine head, no boxes (control) | 0.936 | 0.794 | +0.000 (-0.045 to +0.045) |
 | Oversample small x3 | 0.932 | 0.761 (0.688 to 0.826) | -0.033 (-0.086 to +0.015) |
 
-<b>Table 3.</b> Out-of-fold AUC and sensitivity on the 180 smallest fractures (by relative box area) at the fixed operating point. Differences are paired, with 95% group-bootstrap intervals
+<b>Table 3.</b> Out-of-fold AUC and sensitivity on the 180 small fractures at the fixed operating point. Differences are paired, with 95% group-bootstrap intervals
 
 </div>
 
-The experiment is inconclusive, and it should not be read as showing no effect. Under the pre-written rule, no run's interval clears zero against the seed-43 baseline, and no box run beats its own no-box control (fine head with boxes against its control: +0.033, -0.010 to +0.076). The direction, however, is consistent. Against seed 42, every auxiliary or box variant gains between +0.03 and +0.07, and three of them would have been reported as wins had only that seed been run. Against the mean of the two baselines, a comparison chosen after the results were seen and therefore exploratory, every auxiliary or box variant has a positive estimate and three box runs have intervals above zero. Oversampling did not help under any comparison. Figure 8 places these estimates against the band spanned by the two baseline seeds.
+No run passes the rule. No interval clears zero against seed 43, and no box run beats its own no-box control. The fine head with boxes beats its control by +0.033 (-0.010 to +0.076). The direction is consistent across comparisons. For the six auxiliary-head and box runs, gains range from 0.000 to 0.039 against seed 43. Against seed 42 the same runs gain 0.033 to 0.072. Against the mean of the two baselines they gain 0.017 to 0.056. That last comparison was chosen after the results were seen. Oversampling gains -0.033, 0.000 and -0.017 under the three comparisons. Figure 11 places these estimates against the two baseline seeds.
 
 <div align="center">
 
 <p align="center">
 <img src="FractureDetection/fig/small_fracture_runs.png" alt="Small fracture runs">
 <br>
-<b>Figure 8.</b> Small-fracture sensitivity by run, with 95% intervals. The shaded band spans the two baseline seeds
+<b>Figure 11.</b> Small-fracture sensitivity by run, with 95% intervals. The shaded band spans the two baseline seeds
 </p>
 <br>
 
 </div>
 
-The band in Figure 8 is the central finding of this section. The two baseline seeds differ by 0.033 with no change at all to the method (18 of the 180 images changed outcome), so gains of 0.03 to 0.05 are the same size as seed variation. Even ignoring that variation, the paired 95% half-width on 180 images is about 0.045, so only differences of roughly 0.065 or more are detectable in principle. A single pair of seeds shows that seed variation is not negligible but does not measure it. A decisive test needs three to five seeds per arm, which has not been run. The rule did its job: it stopped three apparent single-seed wins from being reported as findings. Figures 9 and 10 show what the hardest cases look like.
+The band in Figure 11 is the main result of this section. The two baseline seeds differ by 0.033 with no change to the method, and 18 of the 180 images changed outcome. Seed variation is therefore as large as the gains under test. The paired 95% half-width on 180 images is about 0.045. Only differences of about 0.065 or more are detectable in principle with this design. The rule stopped three single-seed wins against seed 42 from being reported as findings. Figures 12 and 13 show the hardest cases.
 
 <div align="center">
 
 <p align="center">
 <img src="FractureDetection/fig/grid_small.png" alt="Small fracture grid">
 <br>
-<b>Figure 9.</b> Smallest-quartile fractures, three detected (left) and three missed (right), randomly sampled
+<b>Figure 12.</b> Small fractures, three detected (left) and three missed (right), randomly sampled
 </p>
 <br>
 
@@ -268,75 +338,97 @@ The band in Figure 8 is the central finding of this section. The two baseline se
 <p align="center">
 <img src="FractureDetection/fig/gradcam_small.gif" alt="Small fracture animation" width="85%">
 <br>
-<b>Figure 10.</b> A detected and a missed small fracture. The annotated box appears first and the Grad-CAM heatmap follows. In the missed case the heatmap peak lies away from the box
+<b>Figure 13.</b> A detected and a missed small fracture. The annotated box appears first and the Grad-CAM heatmap follows. In the missed case the heatmap peak lies away from the box
 </p>
 <br>
 
 </div>
 
-Whether or not small fractures can be fixed, the external results already show that the operating point a model reaches depends heavily on where it is evaluated. The last part of the report asks what that difference could mean in an emergency department.
-
 ---
 
-## Illustrative ED Simulation
+## 11. Illustrative ED Simulation
 
-An AUC does not say how many patients are affected. To translate the two measured operating points into workload and missed fractures, a discrete-event simulation models one typical English major (Type 1) emergency department for a year, averaged over 10 simulated years. It is labelled illustrative because most of its inputs are assumptions. Only the national volume is sourced, from NHS England data (1.503 million Type 1 attendances in September 2026). The following are assumed: 120 departments (so per-department volume may be overstated); 12% of attendances having a limb X-ray, about 49 a day; a fracture prevalence of 20%; a daytime-peaked arrival pattern; one reporter working nine hours a day at 75% or 95% load; a **usual miss rate** of 5%, meaning the share of fractures the ED clinician misses before the radiology report (published studies give roughly 1% to 4%); and a probability of 0.8 that an AI alert on a missed fracture leads the clinician to correct it. AI and clinician errors are assumed independent, which is optimistic.
+A discrete-event simulation translates the two measured operating points into missed fractures and workload. It models one typical English major (Type 1) emergency department (ED) for a year, averaged over 10 simulated years. Only the national volume is sourced, from NHS England data (1.503 million Type 1 attendances in September 2026). The other inputs are assumptions. They include 120 departments, about 49 limb X-rays a day and a fracture prevalence of 20%. They also include a **usual miss rate** of 5% by the ED clinician before the radiology report. An AI alert on a missed fracture leads to correction with probability 0.8.
 
-The model is used in two ways. As an **alert**, a flagged image prompts a clinician re-read while the patient is still in the department. As **triage**, flagged images move to the front of the reporting queue. The outcome measure is **undetected fracture-hours**: the sum, over all fractures missed in the ED, of the hours until the report corrects them. Under these assumptions there are about 182 missed fractures a year. Used as an alert, the internal operating point (sensitivity 0.81, specificity 0.90) catches 109 of them, at the cost of about 12 extra re-reads a day, of which 4 are false alarms and the rest are fractures already diagnosed. The external first-visit point (sensitivity 0.54, specificity 0.79) catches 71 and produces 13.5 re-reads a day, of which 8.2 are false alarms. It therefore finds about a third fewer misses and roughly doubles the false alarms. Triage helps little when the reporter has spare time and more when the reporter is busy: with the internal point at 95% load it lowers undetected fracture-hours from 1,760 to 1,110 a year. The harm of false alerts, the clinician time they cost, patient harm from delay, appointment capacity and real rosters are not modelled.
+As an **alert**, a flagged image prompts a re-read while the patient is still in the ED. As **triage**, flagged images move to the front of the reporting queue. The simulation applies a missed-fracture sensitivity of 0.761 for the internal point. This is the small-fracture sensitivity, used as a proxy for subtle misses. For the external point it applies 0.509, which is 0.54 x 0.761 / 0.808.
+
+Under these assumptions the ED misses about 182 fractures a year. The internal point (sensitivity 0.81, specificity 0.90) catches 109 of them. It costs about 12 extra re-reads a day, of which 4 are false alarms. The external first-visit point (sensitivity 0.54, specificity 0.79) catches 71. It costs 13.5 re-reads a day, of which 8.2 are false alarms. Triage helps most when the reporter is busy. At 95% reporter load, the internal point lowers undetected fracture-hours from 1,760 to 1,110 a year.
 
 <div align="center">
 
 <p align="center">
 <img src="FractureDetection/fig/ed_simulation.png" alt="ED simulation">
 <br>
-<b>Figure 11.</b> Illustrative ED simulation at a 5% usual miss rate, comparing the internal and external operating points. A comparison of assumptions, not a prediction
+<b>Figure 14.</b> Illustrative ED simulation at a 5% usual miss rate, comparing the internal and external operating points. A comparison of assumptions, not a prediction
 </p>
 <br>
 
 </div>
 
-Figure 11 makes the practical consequence of the external results visible: the same model, planned around its internal figure, would be expected to catch noticeably more misses with fewer false alarms than its external figure supports. The simulation is site-parameterised, with functions that calibrate arrivals, shift pattern and reporting time from timestamps and then validate them on a held-out period against tolerances fixed beforehand. On synthetic data generated by the same code from a hidden site, calibration recovered the site and validation passed, but that test is circular: it shows that the fitting works on a correctly specified model and says nothing about a real hospital. The model would become a digital twin of a real site only after calibration and validation on that site's own data, and prevalence, miss rate and alert catch probability cannot be learned from timestamps.
+Figure 14 shows that planning around the internal figure overstates caught misses and understates false alarms. The simulation code can calibrate arrivals and reporting times from a site's timestamps. It becomes a site model only after calibration and validation on real local data.
 
-A companion break-even analysis asks the same question in cost terms. It computes the highest price per scan at which the AI would be cost-neutral, over a 5 x 5 grid in which the cost of a missed fracture and the usual miss rate are axes and no value is sourced. At the external first-visit point that price is lower than at the internal point in every cell (for example 3.2 against 12.6 at a 10% miss rate and a cost of 1,000 per miss) and is negative in 11 of the 25 cells, against 5 for the internal point.
+A companion break-even analysis computes the highest cost-neutral price per scan. It uses a 5 x 5 grid of unsourced values for the cost of a missed fracture and the usual miss rate. At a 10% miss rate and a cost of 1,000 per miss, the price is 3.2 at the external point and 12.6 at the internal point. The external price is negative in 11 of 25 cells, against 5 for the internal point.
 
 <div align="center">
 
 <p align="center">
 <img src="FractureDetection/fig/breakeven.png" alt="Break-even">
 <br>
-<b>Figure 12.</b> Illustrative break-even grid. Costs and usual miss rates are axes, and none of the values are sourced
+<b>Figure 15.</b> Illustrative break-even grid. Costs and usual miss rates are axes, and none of the values are sourced
 </p>
 <br>
 
 </div>
 
-Figure 12 supports only one conclusion, but it is the same one as Figure 11: whether a fracture AI is viable is decided by its external performance, not its internal performance.
+Figure 15 leads to the same conclusion as Figure 14. External performance, not internal performance, decides whether a fracture AI is viable.
 
 ---
 
-## What the Results Mean
+## 12. Discussion
 
-Taken together, the results describe one model measured four ways, and the measurements disagree by more than any of their confidence intervals. Internal accuracy overstates what a deployed model would do. The AUC of 0.923 on FracAtlas falls to 0.825 on GRAZPEDWRI-DX, to 0.744 without casts or metal, and to 0.697 on initial exams, where sensitivity at the pre-fixed threshold is 0.540. Some of this drop is a task change rather than a pure domain shift, since the model moves from mixed adult anatomy to paediatric wrists only, but either way an evaluation confined to a random split of the source data would not have revealed it.
+One model, measured four ways, gives answers that differ by more than their confidence intervals. The AUC is 0.923 on FracAtlas and 0.825 on GRAZPEDWRI-DX. It is 0.744 without casts or metal and 0.697 on first-visit exams. Part of this drop is a task change, from mixed adult anatomy to paediatric wrists. A random split of the source data would reveal none of it.
 
-Part of the external performance is a shortcut. The model treats a cast as evidence of fracture, and a cast shifts its score more than a fracture does. This could not have been found in FracAtlas, which has no cast label. The practical lesson is that external results should be reported with and without treatment artefacts, and that the cleaner subset (here 0.744, or 0.697 for first visits) is the fairer headline.
+The largest single effect is treatment status. Inside the same patient, a cast raises the score by about 4 logits. At first presentation a fracture raises it by about 2 logits. Follow-up exams without a cast also score high, whatever their label. The features encode cast almost perfectly, Grad-CAM moves off bone on casted wrists, and blur removes much of the casted score. Together these findings fit a cast and treatment cue. None of them alone proves the mechanism.
 
-The saliency audits support the model on average and not in every case. Heatmaps and occlusion agree that the model usually relies on the fracture region, but most images remain flagged after the fracture is covered, so saliency is evidence to review, not a proof of mechanism.
+This shortcut has a practical consequence. At first presentation no cast exists, and the model's performance there is the weakest. External results should therefore be reported with and without treatment artefacts. The first-visit figure (0.697) is the fairer headline for a triage use case.
 
-Finally, the small-fracture experiments are a finding about measurement rather than about the method. With two seeds and 180 test images, a gain of 0.03 to 0.05 cannot be distinguished from run-to-run variation, and the same caution may apply to published comparisons of similar size that report a single training run. The simulation, under its stated assumptions, turns the gap between internal and external operating points into fewer caught misses and more false alarms, which is why the external figure, not the internal one, should be used for planning.
+The fracture-level audits on FracAtlas support the model on average. Heatmaps and occlusion agree that it often uses the fracture region. Most images stay flagged after the fracture is covered, so the fracture is not the whole story.
 
----
-
-## Limitations and Future Work
-
-Several limits bound these conclusions. Every setting was trained once, with one extra seed for the baseline only, so run-to-run variance is not estimated and individual intervals understate the uncertainty. FracAtlas has no patient identifiers, so leakage between near-identical images of the same patient that the hash grouping did not catch is still possible, and the comparison of naive and controlled splits cannot show how large it is. GRAZPEDWRI-DX contains paediatric wrist images from a single Siemens machine, which makes a device shortcut untestable, while FracAtlas mixes body parts and has only 381 fractured hand images. The cast, view and fracture-type analyses are post hoc. The provenance of the GRAZPEDWRI-DX `fracture_visible` label was not checked, and the licences of both datasets are unverified. The simulation rests on assumptions and the break-even analysis is illustrative, so neither is evidence about clinical benefit.
-
-The most useful extensions follow directly from these limits. The decisive small-fracture test needs three to five seeds per arm, analysed jointly. Training at a higher resolution, and training with GRAZPEDWRI-DX patients included, were not tried. A stricter occlusion control placed on the same bone would remove one caveat from the saliency audit, and a model trained on paired frontal and lateral views could change the view analysis. Calibrating the simulation on real timestamps from a single site would be the step that turns the machinery into a genuine site model. Prospective multi-site evaluation remains the standard against which any such system should be judged.
+The small-fracture experiments are a finding about measurement. With two seeds and 180 images, a gain of a few points cannot be separated from seed variation. Published comparisons of similar size that report one training run deserve the same caution.
 
 ---
 
-## Repository Layout and Reproduction
+## 13. Contributions
 
-All code is in `FractureDetection/`. The `fracai/` package holds the library code (data, split, training, metrics, audit, break-even, simulation), `scripts/` has one folder each for data preparation, training, audits, analysis and simulation, `jobs/` has the resumable shell runners, and `docs/` holds the analysis plan, limitations, data licence notes and the paper draft with its PDF. The unit tests run with `pytest`.
+1. **A fully open, leak-controlled evaluation pipeline.** Near-duplicate radiographs are grouped before splitting, and every FracAtlas image is scored by a model that never saw it. The threshold is fixed on validation data and never refitted, including on the external set.
+
+2. **An audit of what the detector relies on.** Within-patient tests, feature probes, Grad-CAM and perturbations expose a cast and treatment shortcut. This shortcut moves the score more than a fracture does at first presentation. The audit also exposes collapse on first-visit exams and weak performance on small fractures and older patients.
+
+3. **A measured account of what the data can resolve.** The pipeline releases a pre-written decision rule, a seed-variance check, a resolution test and an illustrative ED simulation as code. Any other fracture model can be put through the same questions.
+
+---
+
+## 14. Limitations and Future Work
+
+This is a retrospective study on public data, and it makes no clinical claim. Every setting was trained once, with one extra seed for the baseline only. Run-to-run variance is therefore not estimated, and single intervals understate the uncertainty.
+
+FracAtlas has no patient identifiers. Leakage between images of one patient that the hash grouping missed remains possible. The naive-versus-controlled comparison cannot measure its size. FracAtlas mixes body parts and contains only 381 fractured hand images.
+
+GRAZPEDWRI-DX is paediatric and wrist-only. Its 112 Agfa images can rule out only very large device effects. Images with a blank `initial_exam` field were treated as follow-ups. The provenance of the `fracture_visible` label was not checked. The licence terms of both datasets have not been verified and should be checked before any redistribution.
+
+The cast, view, fracture-type, age, sex and device analyses are post hoc. So are the 0.744 and 0.697 subsets. The five-fold ensemble's cut-off of zero was never checked on held-out external data. The cast effect remains partly mixed with time since injury, because the casted exam came first in 96% of pairs. The non-fractured within-patient contrast rests on 10 patients.
+
+The probe shows that information is readable, not that the classifier uses it. The Grad-CAM intensity split cannot separate plaster from bone. Perturbations push images off the training distribution, and the bright-pixel mask is limited by a mask artefact. The occlusion control patch is chosen by brightness and may not lie on bone. The FracAtlas visual audit used one reader, an AI model and not a radiologist, on 512-pixel images, with no second reader. The reader knew that the random set was fractured, which may raise its cast count.
+
+The small-fracture decision rule was self-timestamped, not externally registered, and was tightened once. The ED simulation rests on assumptions, and the break-even values are unsourced. Neither is evidence of clinical benefit.
+
+The most useful extensions follow from these limits. A same-wrist counterfactual test, with and without a cast, would establish the shortcut causally. Training with treatment-balanced data, or with casted images excluded, would show whether first-visit accuracy improves. The small-fracture test needs three to five seeds per arm. Training at higher resolution, on paired views or with GRAZPEDWRI-DX patients was not tried. Prospective multi-site evaluation remains the standard for any such system.
+
+---
+
+## 15. Repository Layout and Reproduction
+
+All code lives in `FractureDetection/` in this repository. The `fracai/` package holds the library code: data, split, training, metrics, audit, Grad-CAM, break-even and simulation. The `scripts/` folder has one subfolder each for data preparation, training, audits, analysis and simulation. The `jobs/` folder holds the resumable shell runners. The `docs/` folder holds the analysis plan, limitations, data licence notes and the paper draft. The test suite has 28 tests, run with `pytest`, and `ruff` passes.
 
 ```
 cd FractureDetection
@@ -344,11 +436,13 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 ```
 
-Run every script from the `FractureDetection` folder with `PYTHONPATH=.` in this order: the data scripts (hashing, split, image caches, weights), `bash jobs/run_training.sh`, the box and audit scripts, the control and small-fracture runs, the analysis scripts, and finally the simulation. Datasets and model weights are not included and have to be downloaded from their original sources. Re-running the audits from the saved score files in a clean copy reproduced the reported numbers exactly. A full retraining from scratch has not been repeated.
+Run every script from the `FractureDetection` folder with `PYTHONPATH=.`. The order is the data scripts, then `bash jobs/run_training.sh`, then the box and audit scripts. The control and small-fracture runs, the analysis scripts and the simulation follow. The shortcut audit runs with `bash jobs/run_audits.sh`. It calls `scripts/analysis/a1_cast_within_patient.py`, `a2_age_sex.py` and `a3_device.py` on the saved external scores. It then calls `scripts/audit/b1_feature_probe.py`, `b2_cam_cast.py` and `b3_perturb.py` on the saved fold models, and `scripts/analysis/audit_figures.py` for the figures. The FracAtlas visual audit uses `scripts/analysis/cast_contact_sheets.py`, `cast_contact_sheets_fxrand.py` and `cast_annotation_summary.py`.
+
+Datasets and model weights are not included and must be downloaded from their original sources. Re-running the audits from the saved score files in a clean copy reproduced the reported numbers. A full retraining from scratch has not been repeated.
 
 ---
 
-## References
+## 16. References
 
 1. Abedeen et al. (2023). FracAtlas: A Dataset for Fracture Classification, Localization and Segmentation of Musculoskeletal Radiographs. Scientific Data 10.
 2. Nagy et al. (2022). A pediatric wrist trauma X-ray dataset (GRAZPEDWRI-DX) for machine learning. Scientific Data 9.

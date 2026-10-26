@@ -84,17 +84,36 @@ for j, r in enumerate(cases):
         ax.set_xlim(0, s)
         ax.set_ylim(s, 0)
         ax.axis("off")
-    fig.text((tile_x(j) + tile / 2) / W, (H - top_cap) / H, f"{r.bodypart.capitalize()}, score {r.score:+.1f}", fontsize=9, ha="center", va="center")
+    fig.text(
+        (tile_x(j) + tile / 2) / W,
+        (H - top_cap) / H,
+        f"{r.bodypart.capitalize()}, score {r.score:+.1f}",
+        fontsize=9,
+        ha="center",
+        va="center",
+    )
 
 # group headers with a rule, then row labels on the left
-for first, label, colour in [(0, "Detected: score above the fixed threshold", BLUE), (3, "Missed: score below it", RED)]:
+for first, label, colour in [
+    (0, "Detected: score above the fixed threshold", BLUE),
+    (3, "Missed: score below it", RED),
+]:
     x = tile_x(first)
     y = (H - 0.22) / H
     fig.add_artist(plt.Line2D([x / W, (x + 3 * tile + 2 * gap) / W], [y - 0.045, y - 0.045], color=colour, lw=1.5))
     fig.text(x / W, y, label, fontsize=12, fontweight="bold", color=colour, va="center")
 for top, label in [(row1, "Radiograph"), (row2, "Grad-CAM")]:
-    fig.text(0.38 / W, (H - top - tile / 2) / H, label, fontsize=12, fontweight="bold", rotation=90, ha="center", va="center")
-fig.text(left0 / W, 0.14 / H, "Dashed box: annotated fracture. Grad-CAM: where the model looked. Threshold: 90% specificity, fixed on validation data.", fontsize=9, color=GREY, va="center")
+    fig.text(
+        0.38 / W, (H - top - tile / 2) / H, label, fontsize=12, fontweight="bold", rotation=90, ha="center", va="center"
+    )
+fig.text(
+    left0 / W,
+    0.14 / H,
+    "Dashed box: annotated fracture. Grad-CAM: where the model looked. Threshold: 90% specificity, fixed on validation data.",
+    fontsize=9,
+    color=GREY,
+    va="center",
+)
 
 fig.savefig(OUT / "banner.png", dpi=200)
 print("saved", OUT / "banner.png")

@@ -15,3 +15,7 @@ docs/paper/*.blg
 docs/paper/*.log
 docs/paper/*.out
 !fig/*.gif
+
+# LaTeX build files
+*.fdb_latexmk
+*.fls

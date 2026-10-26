@@ -35,6 +35,18 @@ def test_threshold_gives_requested_specificity():
     assert abs(sens_spec(d.y, d.score, t)[1] - 0.9) < 0.01
 
 
+def test_threshold_specificity_is_within_one_negative_of_target():
+    # not a guarantee of >= 0.90: on the real validation folds it came out 0.899 to 0.900
+    below = False
+    for n in range(50, 3000, 97):
+        d = _scores(n, seed=n)
+        n_neg = (d.y == 0).sum()
+        sp = sens_spec(d.y, d.score, thr_at_spec(d.y, d.score, 0.9))[1]
+        assert abs(sp - 0.9) <= 1 / n_neg
+        below |= sp < 0.9
+    assert below
+
+
 def test_bootstrap_ci_brackets_point_and_is_wider_for_small_samples():
     d = _scores(600)
     p, lo, hi = group_bootstrap(d, lambda x: safe_auc(x.y, x.score), "group", 300)
