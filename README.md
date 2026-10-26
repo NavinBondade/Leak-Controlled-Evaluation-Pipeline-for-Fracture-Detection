@@ -30,7 +30,7 @@ The development set is FracAtlas [1]. It contains 4,083 radiographs, and 719 of 
 
 The external set is GRAZPEDWRI-DX [2]. It holds 20,327 paediatric wrist images from 6,091 patients. Of these, 20,215 images come from Siemens equipment and 112 from Agfa equipment. The fracture label is the dataset's `fracture_visible` field, and a blank field counts as no fracture. This gives 13,550 fractured images (66.7%). The dataset also supplies `cast`, `metal`, `initial_exam`, age, sex and AO fracture class. An **initial exam** is an image whose `initial_exam` field equals 1; all other images count as **follow-ups**. Every external interval resamples whole patients.
 
-Prevalence differs strongly between the two sets (17.6% against 66.7%). The study therefore compares only AUC, sensitivity and specificity across them. Table 1 summarises the two sets.
+Prevalence differs strongly between the two sets (17.6% against 66.7%). The study therefore compares only AUC, sensitivity and specificity across them.
 
 <div align="center">
 
@@ -61,7 +61,7 @@ The **operating point** is the decision threshold, fixed before any test data is
 
 The **five-fold ensemble** score is the mean of the five fold models' shifted logits. The pipeline uses it for every external image, with the cut-off of zero and no refitting. Internally the five-fold ensemble is never used, because the other four models trained or validated on each image. The internal headline AUC pools the shifted out-of-fold scores of all 4,083 images.
 
-Every interval is a 95% percentile bootstrap with 1,000 draws that resamples whole groups. Groups are near-duplicate groups in FracAtlas and patients in GRAZPEDWRI-DX. Two exceptions use fewer draws: the resolution test (300) and the feature-probe intervals (200). Paired comparisons of two training runs reuse the same resampled groups for both. Figure 1 shows the full pipeline.
+Every interval is a 95% percentile bootstrap with 1,000 draws that resamples whole groups. Groups are near-duplicate groups in FracAtlas and patients in GRAZPEDWRI-DX. Two exceptions use fewer draws: the resolution test (300) and the feature-probe intervals (200). Paired comparisons of two training runs reuse the same resampled groups for both.
 
 <div align="center">
 
@@ -85,7 +85,7 @@ Every interval is a 95% percentile bootstrap with 1,000 draws that resamples who
 
 </div>
 
-Figure 2 is a visual guide, not evidence. Sections 7 and 9 test quantitatively where the model looks.
+Sections 7 and 9 test quantitatively where the model looks.
 
 ---
 
@@ -123,7 +123,7 @@ Removing the 6,214 images with a cast or metal leaves 14,113 images, and the AUC
 
 The problem lies in the ranking of images, not only in the threshold. Refitting the threshold on GRAZPEDWRI-DX to 90% specificity yields a sensitivity of only 0.673. This refit is excluded from the main analysis. The five fold models, scored individually, give external AUCs from 0.753 to 0.833. Their external specificity at their own cut-offs ranges from 0.356 to 0.785. A single trained model would therefore give an unstable external estimate. The five-fold ensemble's cut-off of zero was never checked on held-out external data.
 
-The data show no device effect, though only a large one could be detected. The 112 Agfa images give an AUC of 0.774 (0.640 to 0.892), against 0.825 for Siemens images. Within the same patient, label and view, Agfa images score 0.40 logits lower than Siemens images (-1.32 to +0.48). Figure 3 shows the internal and external contrast as ROC curves.
+The data show no device effect, though only a large one could be detected. The 112 Agfa images give an AUC of 0.774 (0.640 to 0.892), against 0.825 for Siemens images. Within the same patient, label and view, Agfa images score 0.40 logits lower than Siemens images (-1.32 to +0.48).
 
 <div align="center">
 
@@ -169,7 +169,7 @@ In 96% of pairs the casted exam came first. Time since injury is therefore partl
 
 ### 7.3 What the features encode
 
-A linear probe asks which properties the model's features make readable. The probe uses the 768-dimensional pooled features of each fold model on 3,967 GRAZPEDWRI-DX images. It holds out whole patients. Figure 5 compares it with a probe on raw pixels.
+A linear probe asks which properties the model's features make readable. The probe uses the 768-dimensional pooled features of each fold model on 3,967 GRAZPEDWRI-DX images. It holds out whole patients.
 
 <div align="center">
 
@@ -186,7 +186,7 @@ The features encode cast almost perfectly (AUC 0.998). They encode follow-up sta
 
 ### 7.4 Grad-CAM on casted wrists
 
-Grad-CAM [4] from the five fold models was averaged on 600 GRAZPEDWRI-DX images, half casted and half not. Each image was split by intensity into dark (air), mid (soft tissue) and bright (bone-like) regions. On casted wrists, the share of the top 10% of CAM mass on bright pixels falls from 0.356 to 0.226. The difference is -0.13 (-0.16 to -0.10), while the bright area stays about 19% in both groups. The intensity split cannot separate plaster from bone, so this is a correlate. Figure 6 shows random examples.
+Grad-CAM [4] from the five fold models was averaged on 600 GRAZPEDWRI-DX images, half casted and half not. Each image was split by intensity into dark (air), mid (soft tissue) and bright (bone-like) regions. On casted wrists, the share of the top 10% of CAM mass on bright pixels falls from 0.356 to 0.226. The difference is -0.13 (-0.16 to -0.10), while the bright area stays about 19% in both groups. The intensity split cannot separate plaster from bone, so this is a correlate.
 
 <div align="center">
 
@@ -217,7 +217,7 @@ On initial exams the model is weakest on frontal views. Frontal views give an AU
 
 By AO fracture class, first-visit sensitivity is 51% for the most common class, 23r-M (3,173 images). It is 67% for 23-M, 49% for 23r-E and 79% for 22r-D (62 images). Counts are images; only classes with at least 30 patients are shown.
 
-Age and sex were tested on no-cast initial exams, where the cast and follow-up effects are absent. Figure 7 shows the result.
+Age and sex were tested on no-cast initial exams, where the cast and follow-up effects are absent.
 
 <div align="center">
 
@@ -273,13 +273,13 @@ An occlusion test checks the same question by intervention. Covering the fractur
 
 </div>
 
-In Figure 8 the heatmaps of detected fractures tend to sit on the box. In Figure 9 the heatmaps of missed fractures often do not. Figure 10 shows the confident false alarms that Section 7.6 examined. On average the model uses the fracture region, but the fracture alone does not carry the decision.
+In Figure 8 the heatmaps of detected fractures tend to sit on the box. In Figure 9 the heatmaps of missed fractures often do not. On average the model uses the fracture region, but the fracture alone does not carry the decision.
 
 ---
 
 ## 10. Small Fractures
 
-Section 5 showed that small fractures are detected less often (76.1% against 88.9%). This section asks whether that gap can be closed and whether a realistic gain can be measured. The primary metric is sensitivity on the 180 small fractures at the fixed operating point, with the same folds in every run.
+Section 5 showed that small fractures are detected less often (76.1% against 88.9%). The primary metric is sensitivity on the 180 small fractures at the fixed operating point, with the same folds in every run.
 
 Resolution was ruled out first. Reducing images to 128 pixels and restoring them to 512 lowers the AUC from 0.923 to 0.850, mostly through false alarms. Small-fracture sensitivity does not fall (0.76 native, 0.77 to 0.80 degraded). Upscaling the input to 640 or 768 pixels adds nothing.
 
@@ -305,7 +305,7 @@ A decision rule was written down before the fine head, its control and the overs
 
 </div>
 
-No run passes the rule. No interval clears zero against seed 43, and no box run beats its own no-box control. The fine head with boxes beats its control by +0.033 (-0.010 to +0.076). The direction is consistent across comparisons. For the six auxiliary-head and box runs, gains range from 0.000 to 0.039 against seed 43. Against seed 42 the same runs gain 0.033 to 0.072. Against the mean of the two baselines they gain 0.017 to 0.056. That last comparison was chosen after the results were seen. Oversampling gains -0.033, 0.000 and -0.017 under the three comparisons. Figure 11 places these estimates against the two baseline seeds.
+No run passes the rule. No interval clears zero against seed 43, and no box run beats its own no-box control. The fine head with boxes beats its control by +0.033 (-0.010 to +0.076). The direction is consistent across comparisons. For the six auxiliary-head and box runs, gains range from 0.000 to 0.039 against seed 43. Against seed 42 the same runs gain 0.033 to 0.072. Against the mean of the two baselines they gain 0.017 to 0.056. That last comparison was chosen after the results were seen. Oversampling gains -0.033, 0.000 and -0.017 under the three comparisons.
 
 <div align="center">
 
